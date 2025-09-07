@@ -1,0 +1,316 @@
+'use client';
+
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from '@/components/ai-elements/conversation';
+import { Message, MessageContent } from '@/components/ai-elements/message';
+import {
+  PromptInput,
+  PromptInputButton,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from '@/components/ai-elements/prompt-input';
+import { Actions, Action } from '@/components/ai-elements/actions';
+import { useState, Fragment, useMemo, useRef, useEffect } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { Response } from '@/components/ai-elements/response';
+import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
+import { GlobeIcon, CopyIcon, RefreshCcwIcon } from 'lucide-react';
+import {
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
+} from '@/components/ai-elements/sources';
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from '@/components/ai-elements/reasoning';
+import { Loader } from '@/components/ai-elements/loader';
+import { Task, TaskContent, TaskItem, TaskTrigger } from '@/components/ai-elements/task';
+import {
+  InlineCitation,
+  InlineCitationCard,
+  InlineCitationCardBody,
+  InlineCitationCardTrigger,
+  InlineCitationCarousel,
+  InlineCitationCarouselContent,
+  InlineCitationCarouselHeader,
+  InlineCitationCarouselIndex,
+  InlineCitationCarouselItem,
+  InlineCitationSource,
+} from '@/components/ai-elements/inline-citation';
+
+const models = [
+  {
+    name: 'Deepseek R1',
+    value: 'deepseek/deepseek-r1',
+  },
+  {
+    name: 'GPT 4o',
+    value: 'openai/gpt-4o',
+  },
+];
+
+const ChatBotDemo = () => {
+  const [input, setInput] = useState('');
+  const [model, setModel] = useState<string>(models[0].value);
+  const [webSearch, setWebSearch] = useState(false);
+  const { messages, sendMessage, status } = useChat();
+  const [isThinking, setIsThinking] = useState(false)
+  const [thinkingText, setThinkingText] = useState('')
+  const [taskItems, setTaskItems] = useState<string[]>([])
+  const [lastSources, setLastSources] = useState<any[]>([])
+  const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
+    }
+  }, [])
+  const lastMessage = messages.at(-1) as any | undefined;
+  const lastIsUser = lastMessage?.role === 'user';
+  const mockReasoning = useMemo(() => {
+    if (!lastIsUser) return '';
+    const text = lastMessage.content ?? lastMessage.parts?.find?.((p: any) => p.type === 'text')?.text ?? '';
+    return text ? `Thinking about: "${text}"` : 'Thinking…';
+  }, [lastIsUser, lastMessage]);
+  const shouldShowMockAssistant = useMemo(() => {
+    // When last message is user and we're not actively submitting/streaming, fake a reply
+    return lastIsUser && status === 'ready';
+  }, [lastIsUser, status]);
+  const regenerate = () => {
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user') as any
+    if (lastUser) {
+      sendMessage({ text: lastUser.content ?? lastUser.parts?.find?.((p: any) => p.type === 'text')?.text ?? '' })
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) {
+      const userText = input;
+      setInput('');
+      // Send user message into the local message list for UI
+      sendMessage({ text: userText });
+      // Start thinking immediately
+      if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
+      setThinkingText('Thinking…')
+      setIsThinking(true)
+      // Hit dummy service to guarantee reasoning + reply
+      try {
+        const res = await fetch('/api/dummy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: userText }),
+        })
+        const data = await res.json()
+        // Update displayed task details while thinking
+        const reason = String(data?.reasoning || 'Thinking…')
+        setThinkingText(reason)
+        setTaskItems([
+          'Receive prompt',
+          'Analyze intent',
+          'Plan outline',
+          'Draft response',
+        ])
+        setLastSources(Array.isArray(data?.sources) ? data.sources.slice(0,5) : [])
+        thinkingTimerRef.current = setTimeout(() => {
+          setIsThinking(false)
+          // After thinking, push final text response and actions appear under it
+          sendMessage({
+            role: 'assistant',
+            parts: [{ type: 'text', text: String(data?.reply || 'Here is a demo response.') }],
+          } as any)
+        }, 3500)
+      } catch (err) {
+        if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
+        setIsThinking(false)
+        sendMessage({
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'Demo response (network error).'}],
+        } as any)
+      }
+    }
+  };
+
+  return (
+    <div className="bg-background overflow-hidden rounded-lg border shadow h-full flex p-3 flex-col relative">
+      <div className="flex flex-col h-full">
+        <Conversation className="flex-1 min-h-0">
+          <ConversationContent>
+            {messages.map((message) => (
+              <div key={message.id}>
+                {message.role === 'assistant' && (message as any).parts?.filter((part: any) => part.type === 'source-url').length > 0 && (
+                  <Sources>
+                    <SourcesTrigger
+                      count={(message as any).parts.filter(
+                        (part: any) => part.type === 'source-url',
+                      ).length}
+                    />
+                    {(message as any).parts.filter((part: any) => part.type === 'source-url').map((part: any, i: number) => (
+                      <SourcesContent key={`${message.id}-${i}`}>
+                        <Source
+                          key={`${message.id}-${i}`}
+                          href={part.url}
+                          title={part.url}
+                        />
+                      </SourcesContent>
+                    ))}
+                  </Sources>
+                )}
+                {(message as any).parts?.map?.((part: any, i: number) => {
+                  switch (part.type) {
+                    case 'text':
+                      return (
+                        <Fragment key={`${message.id}-${i}`}>
+                          <Message from={message.role}>
+                            <MessageContent>
+                              <div className="flex flex-row flex-wrap items-baseline gap-1">
+                                <Response className="inline">
+                                  {part.text}
+                                </Response>
+                                {message.role === 'assistant' && !!lastSources.length && (
+                                  <InlineCitation>
+                                    <InlineCitationCard>
+                                      <InlineCitationCardTrigger sources={lastSources.map((s:any)=>s.url)} />
+                                      <InlineCitationCardBody>
+                                        <InlineCitationCarousel>
+                                          <InlineCitationCarouselHeader>
+                                            <InlineCitationCarouselIndex />
+                                          </InlineCitationCarouselHeader>
+                                          <InlineCitationCarouselContent>
+                                            {lastSources.map((s:any, idx:number)=> (
+                                              <InlineCitationCarouselItem key={idx}>
+                                                <InlineCitationSource title={s.title} url={s.url} description={s.description} />
+                                              </InlineCitationCarouselItem>
+                                            ))}
+                                          </InlineCitationCarouselContent>
+                                        </InlineCitationCarousel>
+                                      </InlineCitationCardBody>
+                                    </InlineCitationCard>
+                                  </InlineCitation>
+                                )}
+                              </div>
+                            </MessageContent>
+                          </Message>
+                          {message.role === 'assistant' && i === (message as any).parts.length - 1 && (
+                            <Actions className="mt-1">
+                              <Action
+                                onClick={() => regenerate()}
+                                label="Retry"
+                              >
+                                <RefreshCcwIcon className="size-3" />
+                              </Action>
+                              <Action
+                                onClick={() =>
+                                  navigator.clipboard.writeText(part.text)
+                                }
+                                label="Copy"
+                              >
+                                <CopyIcon className="size-3" />
+                              </Action>
+                            </Actions>
+                          )}
+                        </Fragment>
+                      );
+                    case 'reasoning':
+                      return (
+                        <Reasoning
+                          key={`${message.id}-${i}`}
+                          className="w-full"
+                          isStreaming={status === 'streaming' && i === (message as any).parts.length - 1 && message.id === messages.at(-1)?.id}
+                        >
+                          <ReasoningTrigger />
+                          <ReasoningContent>{part.text}</ReasoningContent>
+                        </Reasoning>
+                      );
+                    default:
+                      return null;
+                  }
+                })}
+              </div>
+            ))}
+            {isThinking && (
+              <Task className="w-full">
+                <TaskTrigger title={thinkingText || 'Thinking…'} />
+                <TaskContent>
+                  {taskItems.map((t, idx) => (
+                    <TaskItem key={idx}>{t}</TaskItem>
+                  ))}
+                </TaskContent>
+              </Task>
+            )}
+            {shouldShowMockAssistant && (
+              <Message from="assistant">
+                <MessageContent>
+                  <Response>
+                    {`Here is a demo response to your message: "${(lastMessage as any)?.content ?? ''}"`}
+                  </Response>
+                </MessageContent>
+              </Message>
+            )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+
+        <div className="mt-2">
+          <Suggestions>
+            <Suggestion suggestion="Summarize this document" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="Suggest an outline" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="Fix grammar and tone" onClick={(s) => setInput(s)} />
+          </Suggestions>
+        </div>
+
+        <PromptInput onSubmit={handleSubmit} className="mt-2 flex-shrink-0 border-0 shadow-none">
+          <PromptInputTextarea
+            className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            onChange={(e) => setInput(e.target.value)}
+            value={input}
+          />
+          <PromptInputToolbar className="border-0 shadow-none">
+            <PromptInputTools>
+              <PromptInputButton
+                variant={webSearch ? 'default' : 'ghost'}
+                onClick={() => setWebSearch(!webSearch)}
+              >
+                <GlobeIcon size={16} />
+                <span>Search</span>
+              </PromptInputButton>
+              <PromptInputModelSelect
+                onValueChange={(value) => {
+                  setModel(value);
+                }}
+                value={model}
+              >
+                <PromptInputModelSelectTrigger>
+                  <PromptInputModelSelectValue />
+                </PromptInputModelSelectTrigger>
+                <PromptInputModelSelectContent>
+                  {models.map((model) => (
+                    <PromptInputModelSelectItem key={model.value} value={model.value}>
+                      {model.name}
+                    </PromptInputModelSelectItem>
+                  ))}
+                </PromptInputModelSelectContent>
+              </PromptInputModelSelect>
+            </PromptInputTools>
+            <PromptInputSubmit disabled={!input} status={status} />
+          </PromptInputToolbar>
+        </PromptInput>
+      </div>
+    </div>
+  );
+};
+
+export default ChatBotDemo;

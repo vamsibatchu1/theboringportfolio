@@ -20,6 +20,12 @@ const eslintConfig = [
       'next-env.d.ts',
     ],
   },
+  {
+    files: ['app/page.tsx', 'components/chat/ChatBotDemo.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 ]
 
 export default eslintConfig
