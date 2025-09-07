@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { ChevronDownIcon, SearchIcon } from 'lucide-react';
+import { motion } from 'framer-motion'
 import type { ComponentProps } from 'react';
 
 export type TaskItemFileProps = ComponentProps<'div'>;
@@ -66,7 +67,14 @@ export const TaskTrigger = ({
     {children ?? (
       <div className="flex cursor-pointer items-center gap-2 text-muted-foreground hover:text-foreground">
         <SearchIcon className="size-4" />
-        <p className="text-sm">{title}</p>
+        <motion.p
+          className="bg-[linear-gradient(110deg,#404040,35%,#fff,50%,#404040,75%,#404040)] bg-[length:200%_100%] bg-clip-text text-sm font-normal text-transparent"
+          initial={{ backgroundPosition: '200% 0' }}
+          animate={{ backgroundPosition: '-200% 0' }}
+          transition={{ repeat: Infinity, duration: 2, ease: 'linear' }}
+        >
+          {title}
+        </motion.p>
         <ChevronDownIcon className="size-4 transition-transform group-data-[state=open]:rotate-180" />
       </div>
     )}

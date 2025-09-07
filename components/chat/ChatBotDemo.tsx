@@ -73,6 +73,52 @@ const ChatBotDemo = () => {
   const [lastSources, setLastSources] = useState<any[]>([])
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const buildThinkingFor = (text: string) => {
+    const q = text.toLowerCase()
+    if (q.includes('research')) {
+      return {
+        title: 'Scanning user research and findings…',
+        items: [
+          'Identify study type and participants',
+          'Surface key insights and pain points',
+          'Map insights to solution directions',
+          'Assemble citations from research notes',
+        ],
+      }
+    }
+    if (q.includes('impact') || q.includes('results') || q.includes('metrics')) {
+      return {
+        title: 'Collecting outcomes and impact metrics…',
+        items: [
+          'Locate KPIs before/after launch',
+          'Summarize quantitative lifts',
+          'Pull qualitative feedback highlights',
+          'Cross‑check assumptions with data',
+        ],
+      }
+    }
+    if (q.includes('process') || q.includes('approach') || q.includes('timeline')) {
+      return {
+        title: 'Reconstructing design process from case study…',
+        items: [
+          'Outline phases and milestones',
+          'Extract artifacts (flows, wireframes, tests)',
+          'Link decisions to evidence',
+          'Prepare concise narrative',
+        ],
+      }
+    }
+    return {
+      title: 'Reading the case study and preparing an answer…',
+      items: [
+        'Parse question intent',
+        'Skim relevant sections',
+        'Draft answer structure',
+        'Fill details and sources',
+      ],
+    }
+  }
+
   useEffect(() => {
     return () => {
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
@@ -105,7 +151,9 @@ const ChatBotDemo = () => {
       sendMessage({ text: userText });
       // Start thinking immediately
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
-      setThinkingText('Thinking…')
+      const thinking = buildThinkingFor(userText)
+      setThinkingText(thinking.title)
+      setTaskItems(thinking.items)
       setIsThinking(true)
       // Hit dummy service to guarantee reasoning + reply
       try {
@@ -115,15 +163,6 @@ const ChatBotDemo = () => {
           body: JSON.stringify({ text: userText }),
         })
         const data = await res.json()
-        // Update displayed task details while thinking
-        const reason = String(data?.reasoning || 'Thinking…')
-        setThinkingText(reason)
-        setTaskItems([
-          'Receive prompt',
-          'Analyze intent',
-          'Plan outline',
-          'Draft response',
-        ])
         setLastSources(Array.isArray(data?.sources) ? data.sources.slice(0,5) : [])
         thinkingTimerRef.current = setTimeout(() => {
           setIsThinking(false)
@@ -145,7 +184,7 @@ const ChatBotDemo = () => {
   };
 
   return (
-    <div className="bg-background overflow-hidden rounded-lg border shadow h-full flex p-3 flex-col relative">
+    <div className="bg-background overflow-hidden rounded-lg border shadow h-full flex flex-col relative">
       <div className="flex flex-col h-full">
         <Conversation className="flex-1 min-h-0">
           <ConversationContent>
@@ -175,8 +214,8 @@ const ChatBotDemo = () => {
                       return (
                         <Fragment key={`${message.id}-${i}`}>
                           <Message from={message.role}>
-                            <MessageContent>
-                              <div className="flex flex-row flex-wrap items-baseline gap-1">
+                            <MessageContent className={message.role === 'user' ? 'bg-black text-white rounded-[16px] px-3 py-2' : undefined}>
+                              <div className="flex flex-row flex-wrap items-baseline gap-2">
                                 <Response className="inline">
                                   {part.text}
                                 </Response>
@@ -264,15 +303,17 @@ const ChatBotDemo = () => {
           <ConversationScrollButton />
         </Conversation>
 
-        <div className="mt-2">
+        <div className="mt-2 px-2">
           <Suggestions>
-            <Suggestion suggestion="Summarize this document" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="Suggest an outline" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="Fix grammar and tone" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="What research methods did you use?" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="What were the key user insights?" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="Show the impact and success metrics" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="Explain the design decisions and trade‑offs" onClick={(s) => setInput(s)} />
+            <Suggestion suggestion="Walk me through the process and timeline" onClick={(s) => setInput(s)} />
           </Suggestions>
         </div>
 
-        <PromptInput onSubmit={handleSubmit} className="mt-2 flex-shrink-0 border-0 shadow-none">
+        <PromptInput onSubmit={handleSubmit} className="mt-2 flex-shrink-0 border-0 px-2 py-2 shadow-none">
           <PromptInputTextarea
             className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
             onChange={(e) => setInput(e.target.value)}
