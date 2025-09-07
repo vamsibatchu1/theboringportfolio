@@ -6,6 +6,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
 import { Message, MessageContent } from '@/components/ai-elements/message';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   PromptInput,
   PromptInputButton,
@@ -197,6 +198,12 @@ const ChatBotDemo = () => {
   return (
     <div className="bg-background overflow-hidden rounded-lg border shadow h-full flex flex-col relative">
       <div className="flex flex-col h-full">
+      <Tabs className="px-2 pt-2 mb-2">
+            <TabsList>
+              <TabsTrigger value="chat">Ask me anything</TabsTrigger>
+              <TabsTrigger value="editor">Casestudy filters</TabsTrigger>
+            </TabsList>
+      </Tabs>
         <Conversation className="flex-1 min-h-0">
           <ConversationContent>
             {messages.map((message) => (
