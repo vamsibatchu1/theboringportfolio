@@ -74,15 +74,21 @@ export async function POST(req: Request) {
       )
     }
 
-    const data = (await completion.json()) as any
-    const full = data?.choices?.[0]?.message?.content || ''
+    type ChatCompletion = {
+      choices?: Array<{
+        message?: { content?: string }
+      }>
+    }
+    const data = (await completion.json()) as ChatCompletion
+    const full = data?.choices?.[0]?.message?.content ?? ''
     // naive split: first line becomes a reasoning hint
     const [firstLine, ...rest] = full.split('\n')
     const reasoning = firstLine?.slice(0, 200) || `Thinking about: "${text?.slice(0, 120) || ''}"`
     const reply = rest.join('\n').trim() || full
 
     // Second call to fetch 5 sources
-    let sources: any[] = []
+    type Source = { title: string; url: string; description?: string; quote?: string }
+    let sources: Source[] = []
     try {
       const src = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -100,9 +106,9 @@ export async function POST(req: Request) {
           temperature: 0.5,
         }),
       })
-      const srcJson = await src.json()
-      const parsed = JSON.parse(srcJson?.choices?.[0]?.message?.content || '{"sources":[]}')
-      sources = Array.isArray(parsed.sources) ? parsed.sources.slice(0,5) : []
+      const srcJson = (await src.json()) as ChatCompletion
+      const parsed = JSON.parse(srcJson?.choices?.[0]?.message?.content ?? '{"sources":[]}') as { sources?: Source[] }
+      sources = Array.isArray(parsed.sources) ? parsed.sources.slice(0, 5) : []
     } catch {}
 
     if (!sources.length) {
@@ -116,11 +122,11 @@ export async function POST(req: Request) {
     }
 
     return Response.json({ reasoning, reply, sources }, { status: 200 })
-  } catch (err: any) {
+  } catch (err: unknown) {
     return Response.json(
       {
         reasoning: 'Thinking…',
-        reply: `Demo response (error fallback): ${String(err?.message || err)}`,
+        reply: `Demo response (error fallback): ${err instanceof Error ? err.message : String(err)}`,
       },
       { status: 200 }
     )
