@@ -155,8 +155,6 @@ export const PromptInputSubmit = ({
 
   if (status === 'submitted') {
     Icon = <Loader2Icon className="size-4 animate-spin" />;
-  } else if (status === 'error') {
-    Icon = <XIcon className="size-4" />;
   }
 
   return (
