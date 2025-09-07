@@ -72,6 +72,13 @@ const ChatBotDemo = () => {
   const [taskItems, setTaskItems] = useState<string[]>([])
   const [lastSources, setLastSources] = useState<any[]>([])
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [suggestions, setSuggestions] = useState<string[]>([
+    'What research methods did you use?',
+    'What were the key user insights?',
+    'Show the impact and success metrics',
+    'Explain the design decisions and trade‑offs',
+    'Walk me through the process and timeline',
+  ])
 
   const buildThinkingFor = (text: string) => {
     const q = text.toLowerCase()
@@ -142,44 +149,48 @@ const ChatBotDemo = () => {
     }
   }
 
+  const processUserText = async (userText: string) => {
+    // Send user message into the local message list for UI
+    sendMessage({ text: userText });
+    // Start thinking immediately
+    if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
+    const thinking = buildThinkingFor(userText)
+    setThinkingText(thinking.title)
+    setTaskItems(thinking.items)
+    setIsThinking(true)
+    // Hit dummy service to guarantee reasoning + reply
+    try {
+      const res = await fetch('/api/dummy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: userText }),
+      })
+      const data = await res.json()
+      setLastSources(Array.isArray(data?.sources) ? data.sources.slice(0,5) : [])
+      thinkingTimerRef.current = setTimeout(() => {
+        setIsThinking(false)
+        // After thinking, push final text response and actions appear under it
+        sendMessage({
+          role: 'assistant',
+          parts: [{ type: 'text', text: String(data?.reply || 'Here is a demo response.') }],
+        } as any)
+      }, 3500)
+    } catch (err) {
+      if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
+      setIsThinking(false)
+      sendMessage({
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Demo response (network error).'}],
+      } as any)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
       const userText = input;
       setInput('');
-      // Send user message into the local message list for UI
-      sendMessage({ text: userText });
-      // Start thinking immediately
-      if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
-      const thinking = buildThinkingFor(userText)
-      setThinkingText(thinking.title)
-      setTaskItems(thinking.items)
-      setIsThinking(true)
-      // Hit dummy service to guarantee reasoning + reply
-      try {
-        const res = await fetch('/api/dummy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: userText }),
-        })
-        const data = await res.json()
-        setLastSources(Array.isArray(data?.sources) ? data.sources.slice(0,5) : [])
-        thinkingTimerRef.current = setTimeout(() => {
-          setIsThinking(false)
-          // After thinking, push final text response and actions appear under it
-          sendMessage({
-            role: 'assistant',
-            parts: [{ type: 'text', text: String(data?.reply || 'Here is a demo response.') }],
-          } as any)
-        }, 3500)
-      } catch (err) {
-        if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
-        setIsThinking(false)
-        sendMessage({
-          role: 'assistant',
-          parts: [{ type: 'text', text: 'Demo response (network error).'}],
-        } as any)
-      }
+      await processUserText(userText)
     }
   };
 
@@ -305,11 +316,16 @@ const ChatBotDemo = () => {
 
         <div className="mt-2 px-2">
           <Suggestions>
-            <Suggestion suggestion="What research methods did you use?" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="What were the key user insights?" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="Show the impact and success metrics" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="Explain the design decisions and trade‑offs" onClick={(s) => setInput(s)} />
-            <Suggestion suggestion="Walk me through the process and timeline" onClick={(s) => setInput(s)} />
+            {suggestions.map((s) => (
+              <Suggestion
+                key={s}
+                suggestion={s}
+                onClick={async (text) => {
+                  setSuggestions((prev) => prev.filter((x) => x !== text))
+                  await processUserText(text)
+                }}
+              />
+            ))}
           </Suggestions>
         </div>
 

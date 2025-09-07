@@ -50,9 +50,7 @@ const VOICE_COMMANDS: Readonly<
   },
 }
 
-export const SUPPORT_SPEECH_RECOGNITION: boolean =
-  CAN_USE_DOM &&
-  ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
+export const SUPPORT_SPEECH_RECOGNITION: boolean = false
 
 function SpeechToTextPluginImpl() {
   const [editor] = useLexicalComposerContext()

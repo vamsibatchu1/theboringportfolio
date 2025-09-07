@@ -7,6 +7,7 @@ import {
   BaseSelection,
   FORMAT_TEXT_COMMAND,
   TextFormatType,
+  SELECT_ALL_COMMAND,
 } from "lexical"
 import {
   BoldIcon,
@@ -56,6 +57,8 @@ export function FontFormatToolbarPlugin({
       pressed={isSelected}
       onPressedChange={setIsSelected}
       onClick={() => {
+        // Select entire document before applying format so the preview text updates as a whole
+        activeEditor.dispatchCommand(SELECT_ALL_COMMAND, undefined)
         activeEditor.dispatchCommand(
           FORMAT_TEXT_COMMAND,
           format as TextFormatType

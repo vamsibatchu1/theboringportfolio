@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   CHECK_LIST,
   ELEMENT_TRANSFORMERS,
@@ -22,7 +22,6 @@ import { TablePlugin } from "@lexical/react/LexicalTablePlugin"
 
 import { ContentEditable } from "@/components/editor/editor-ui/content-editable"
 import { ActionsPlugin } from "@/components/editor/plugins/actions/actions-plugin"
-import { CharacterLimitPlugin } from "@/components/editor/plugins/actions/character-limit-plugin"
 import { ClearEditorActionPlugin } from "@/components/editor/plugins/actions/clear-editor-plugin"
 import { CounterCharacterPlugin } from "@/components/editor/plugins/actions/counter-character-plugin"
 import { EditModeTogglePlugin } from "@/components/editor/plugins/actions/edit-mode-toggle-plugin"
@@ -38,7 +37,7 @@ import { CodeActionMenuPlugin } from "@/components/editor/plugins/code-action-me
 import { CodeHighlightPlugin } from "@/components/editor/plugins/code-highlight-plugin"
 import { CollapsiblePlugin } from "@/components/editor/plugins/collapsible-plugin"
 import { ComponentPickerMenuPlugin } from "@/components/editor/plugins/component-picker-menu-plugin"
-import { ContextMenuPlugin } from "@/components/editor/plugins/context-menu-plugin"
+// Keep editor's internal context-menu plugin disabled; we'll use shadcn context menu
 import { DragDropPastePlugin } from "@/components/editor/plugins/drag-drop-paste-plugin"
 import { DraggableBlockPlugin } from "@/components/editor/plugins/draggable-block-plugin"
 import { AutoEmbedPlugin } from "@/components/editor/plugins/embeds/auto-embed-plugin"
@@ -50,7 +49,7 @@ import { EmojisPlugin } from "@/components/editor/plugins/emojis-plugin"
 import { EquationsPlugin } from "@/components/editor/plugins/equations-plugin"
 import { ExcalidrawPlugin } from "@/components/editor/plugins/excalidraw-plugin"
 import { FloatingLinkEditorPlugin } from "@/components/editor/plugins/floating-link-editor-plugin"
-import { FloatingTextFormatToolbarPlugin } from "@/components/editor/plugins/floating-text-format-plugin"
+// Removed FloatingTextFormatToolbarPlugin per request to use context menu instead
 import { ImagesPlugin } from "@/components/editor/plugins/images-plugin"
 import { InlineImagePlugin } from "@/components/editor/plugins/inline-image-plugin"
 import { KeywordsPlugin } from "@/components/editor/plugins/keywords-plugin"
@@ -58,6 +57,24 @@ import { LayoutPlugin } from "@/components/editor/plugins/layout-plugin"
 import { LinkPlugin } from "@/components/editor/plugins/link-plugin"
 import { ListMaxIndentLevelPlugin } from "@/components/editor/plugins/list-max-indent-level-plugin"
 import { MentionsPlugin } from "@/components/editor/plugins/mentions-plugin"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { CheckCircle2Icon } from "lucide-react"
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { PageBreakPlugin } from "@/components/editor/plugins/page-break-plugin"
 import { AlignmentPickerPlugin } from "@/components/editor/plugins/picker/alignment-picker-plugin"
 import { BulletedListPickerPlugin } from "@/components/editor/plugins/picker/bulleted-list-picker-plugin"
@@ -130,6 +147,7 @@ const maxLength = 500
 export function Plugins({}) {
   const [floatingAnchorElem, setFloatingAnchorElem] =
     useState<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLDivElement | null>(null)
 
   const onRef = (_floatingAnchorElem: HTMLDivElement) => {
     if (_floatingAnchorElem !== null) {
@@ -137,12 +155,41 @@ export function Plugins({}) {
     }
   }
 
+  // When user selects text, synthesize a contextmenu event on the trigger
+  useEffect(() => {
+    const handleShowMenuForSelection = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed) return
+      try {
+        const range = sel.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+        const el = triggerRef.current
+        if (!el) return
+        const evt = new MouseEvent("contextmenu", {
+          bubbles: true,
+          clientX: Math.max(rect.left + rect.width / 2, 0),
+          clientY: Math.max(rect.bottom, 0),
+        })
+        el.dispatchEvent(evt)
+      } catch {}
+    }
+    document.addEventListener("mouseup", handleShowMenuForSelection)
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "Shift" || e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown") {
+        handleShowMenuForSelection()
+      }
+    })
+    return () => {
+      document.removeEventListener("mouseup", handleShowMenuForSelection)
+    }
+  }, [])
+
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       <div className="flex-1 min-h-0 overflow-auto">
         <ToolbarPlugin>
         {({ blockType }) => (
-          <div className="vertical-align-middle sticky top-0 z-10 flex gap-2 overflow-auto border-b p-1">
+          <div className="vertical-align-middle sticky top-0 z-10 flex gap-2 overflow-auto border-b p-1 bg-background">
             <HistoryToolbarPlugin />
             <Separator orientation="vertical" className="h-8" />
             <BlockFormatDropDown>
@@ -198,11 +245,100 @@ export function Plugins({}) {
         <RichTextPlugin
           contentEditable={
             <div className="">
-              <div className="" ref={onRef}>
-                <ContentEditable
-                  placeholder={placeholder}
-                  className="ContentEditable__root relative block min-h-[600px] overflow-auto px-8 py-4 focus:outline-none"
-                />
+              <div className="" ref={onRef} suppressHydrationWarning>
+                <div className="px-8 pt-4">
+                  <Alert>
+                    <CheckCircle2Icon className="h-4 w-4" />
+                    <AlertTitle>Success! Your changes have been saved</AlertTitle>
+                    <AlertDescription>
+                      This is an alert with icon, title and description.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="mt-6">
+                    <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+                      <AccordionItem value="item-1">
+                        <AccordionTrigger>Product Information</AccordionTrigger>
+                        <AccordionContent className="flex flex-col gap-4 text-balance">
+                          <p>
+                            Our flagship product combines cutting-edge technology with sleek design. Built with premium materials, it offers unparalleled performance and reliability.
+                          </p>
+                          <p>
+                            Key features include advanced processing capabilities, and an intuitive user interface designed for both beginners and experts.
+                          </p>
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-2">
+                        <AccordionTrigger>Shipping Details</AccordionTrigger>
+                        <AccordionContent className="flex flex-col gap-4 text-balance">
+                          <p>
+                            We offer worldwide shipping through trusted courier partners. Standard delivery takes 3-5 business days, while express shipping ensures delivery within 1-2 business days.
+                          </p>
+                          <p>
+                            All orders are carefully packaged and fully insured. Track your shipment in real-time through our dedicated tracking portal.
+                          </p>
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-3">
+                        <AccordionTrigger>Return Policy</AccordionTrigger>
+                        <AccordionContent className="flex flex-col gap-4 text-balance">
+                          <p>
+                            We stand behind our products with a comprehensive 30-day return policy. If you&apos;re not completely satisfied, simply return the item in its original condition.
+                          </p>
+                          <p>
+                            Our hassle-free return process includes free return shipping and full refunds processed within 48 hours of receiving the returned item.
+                          </p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                </div>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <div ref={triggerRef}>
+                      <ContentEditable
+                        placeholder={placeholder}
+                        className="ContentEditable__root relative block min-h-[600px] overflow-auto px-8 py-4 focus:outline-none"
+                      />
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-52">
+                    <ContextMenuItem inset>
+                      Back
+                      <ContextMenuShortcut>⌘[</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem inset disabled>
+                      Forward
+                      <ContextMenuShortcut>⌘]</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuItem inset>
+                      Reload
+                      <ContextMenuShortcut>⌘R</ContextMenuShortcut>
+                    </ContextMenuItem>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger inset>More Tools</ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="w-44">
+                        <ContextMenuItem>Save Page...</ContextMenuItem>
+                        <ContextMenuItem>Create Shortcut...</ContextMenuItem>
+                        <ContextMenuItem>Name Window...</ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem>Developer Tools</ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem variant="destructive">Delete</ContextMenuItem>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    <ContextMenuSeparator />
+                    <ContextMenuCheckboxItem checked>
+                      Show Bookmarks
+                    </ContextMenuCheckboxItem>
+                    <ContextMenuCheckboxItem>Show Full URLs</ContextMenuCheckboxItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuRadioGroup value="pedro">
+                      <ContextMenuLabel inset>People</ContextMenuLabel>
+                      <ContextMenuRadioItem value="pedro">Pedro Duarte</ContextMenuRadioItem>
+                      <ContextMenuRadioItem value="colm">Colm Tuite</ContextMenuRadioItem>
+                    </ContextMenuRadioGroup>
+                  </ContextMenuContent>
+                </ContextMenu>
               </div>
             </div>
           }
@@ -295,13 +431,12 @@ export function Plugins({}) {
           ]}
           dynamicOptionsFn={DynamicTablePickerPlugin}
         />
-
-        <ContextMenuPlugin />
+        {/* Removed ContextMenuPlugin; using ShadCN ContextMenu instead */}
         <DragDropPastePlugin />
         <EmojiPickerPlugin />
 
         <FloatingLinkEditorPlugin anchorElem={floatingAnchorElem} />
-        <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
+        {/* Floating text toolbar disabled */}
 
           <ListMaxIndentLevelPlugin />
         </div>
@@ -309,8 +444,7 @@ export function Plugins({}) {
       <ActionsPlugin>
         <div className="clear-both flex items-center justify-between gap-2 overflow-auto border-t p-1">
           <div className="flex flex-1 justify-start">
-            <MaxLengthPlugin maxLength={maxLength} />
-            <CharacterLimitPlugin maxLength={maxLength} charset="UTF-16" />
+            {/* Character limit disabled per request */}
           </div>
           <div>
             <CounterCharacterPlugin charset="UTF-16" />
