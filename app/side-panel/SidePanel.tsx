@@ -6,7 +6,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
 import { Message, MessageContent } from '@/components/ai-elements/message';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   PromptInput,
   PromptInputButton,
@@ -37,7 +37,7 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from '@/components/ai-elements/reasoning';
-import { Loader } from '@/components/ai-elements/loader';
+// import { Loader } from '@/components/ai-elements/loader';
 import { Task, TaskContent, TaskItem, TaskTrigger } from '@/components/ai-elements/task';
 import {
   InlineCitation,
@@ -51,6 +51,26 @@ import {
   InlineCitationCarouselItem,
   InlineCitationSource,
 } from '@/components/ai-elements/inline-citation';
+
+type ChatPart =
+  | { type: 'text'; text: string }
+  | { type: 'source-url'; url: string }
+  | { type: 'reasoning'; text: string };
+
+type ChatRole = 'user' | 'assistant' | 'system';
+
+type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  content?: string;
+  parts?: ChatPart[];
+};
+
+type SourceItem = {
+  title: string;
+  url: string;
+  description?: string;
+};
 
 const models = [
   {
@@ -71,7 +91,7 @@ const ChatBotDemo = () => {
   const [isThinking, setIsThinking] = useState(false)
   const [thinkingText, setThinkingText] = useState('')
   const [taskItems, setTaskItems] = useState<string[]>([])
-  const [lastSources, setLastSources] = useState<any[]>([])
+  const [lastSources, setLastSources] = useState<SourceItem[]>([])
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([
     'What research methods did you use?',
@@ -132,21 +152,18 @@ const ChatBotDemo = () => {
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
     }
   }, [])
-  const lastMessage = messages.at(-1) as any | undefined;
+  const lastMessage = messages.at(-1) as unknown as (ChatMessage | undefined);
   const lastIsUser = lastMessage?.role === 'user';
-  const mockReasoning = useMemo(() => {
-    if (!lastIsUser) return '';
-    const text = lastMessage.content ?? lastMessage.parts?.find?.((p: any) => p.type === 'text')?.text ?? '';
-    return text ? `Thinking about: "${text}"` : 'Thinking…';
-  }, [lastIsUser, lastMessage]);
   const shouldShowMockAssistant = useMemo(() => {
     // When last message is user and we're not actively submitting/streaming, fake a reply
     return lastIsUser && status === 'ready';
   }, [lastIsUser, status]);
   const regenerate = () => {
-    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user') as any
+    const lastUser = [...(messages as unknown as ChatMessage[])].reverse().find((m) => m.role === 'user') as ChatMessage | undefined
     if (lastUser) {
-      sendMessage({ text: lastUser.content ?? lastUser.parts?.find?.((p: any) => p.type === 'text')?.text ?? '' })
+      const lastUserText =
+        lastUser.content ?? (lastUser.parts?.find((p) => p.type === 'text') as Extract<ChatPart, { type: 'text' }> | undefined)?.text ?? ''
+      sendMessage({ text: lastUserText })
     }
   }
 
@@ -167,22 +184,22 @@ const ChatBotDemo = () => {
         body: JSON.stringify({ text: userText }),
       })
       const data = await res.json()
-      setLastSources(Array.isArray(data?.sources) ? data.sources.slice(0,5) : [])
+      setLastSources(Array.isArray(data?.sources) ? (data.sources.slice(0,5) as SourceItem[]) : [])
       thinkingTimerRef.current = setTimeout(() => {
         setIsThinking(false)
         // After thinking, push final text response and actions appear under it
         sendMessage({
           role: 'assistant',
-          parts: [{ type: 'text', text: String(data?.reply || 'Here is a demo response.') }],
-        } as any)
+          parts: [{ type: 'text', text: String(data?.reply || 'Here is a demo response.') } as ChatPart],
+        } as unknown as Parameters<typeof sendMessage>[0])
       }, 3500)
-    } catch (err) {
+    } catch {
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current)
       setIsThinking(false)
       sendMessage({
         role: 'assistant',
-        parts: [{ type: 'text', text: 'Demo response (network error).'}],
-      } as any)
+        parts: [{ type: 'text', text: 'Demo response (network error).'} as ChatPart],
+      } as unknown as Parameters<typeof sendMessage>[0])
     }
   }
 
@@ -206,16 +223,18 @@ const ChatBotDemo = () => {
       </Tabs>
         <Conversation className="flex-1 min-h-0">
           <ConversationContent>
-            {messages.map((message) => (
+            {(messages as unknown as ChatMessage[]).map((message) => (
               <div key={message.id}>
-                {message.role === 'assistant' && (message as any).parts?.filter((part: any) => part.type === 'source-url').length > 0 && (
+                {message.role === 'assistant' && (message.parts?.filter((part) => part.type === 'source-url').length ?? 0) > 0 && (
                   <Sources>
                     <SourcesTrigger
-                      count={(message as any).parts.filter(
-                        (part: any) => part.type === 'source-url',
+                      count={(message.parts ?? []).filter(
+                        (part) => part.type === 'source-url',
                       ).length}
                     />
-                    {(message as any).parts.filter((part: any) => part.type === 'source-url').map((part: any, i: number) => (
+                    {(message.parts ?? [])
+                      .filter((part): part is Extract<ChatPart, { type: 'source-url' }> => part.type === 'source-url')
+                      .map((part, i: number) => (
                       <SourcesContent key={`${message.id}-${i}`}>
                         <Source
                           key={`${message.id}-${i}`}
@@ -226,7 +245,7 @@ const ChatBotDemo = () => {
                     ))}
                   </Sources>
                 )}
-                {(message as any).parts?.map?.((part: any, i: number) => {
+                {(message.parts ?? []).map((part, i: number) => {
                   switch (part.type) {
                     case 'text':
                       return (
@@ -235,19 +254,19 @@ const ChatBotDemo = () => {
                             <MessageContent className={message.role === 'user' ? 'bg-black text-white rounded-[16px] px-3 py-2' : undefined}>
                               <div className="flex flex-row flex-wrap items-baseline gap-2">
                                 <Response className="inline">
-                                  {part.text}
+                                  {(part as Extract<ChatPart, { type: 'text' }>).text}
                                 </Response>
                                 {message.role === 'assistant' && !!lastSources.length && (
                                   <InlineCitation>
                                     <InlineCitationCard>
-                                      <InlineCitationCardTrigger sources={lastSources.map((s:any)=>s.url)} />
+                                      <InlineCitationCardTrigger sources={lastSources.map((s)=>s.url)} />
                                       <InlineCitationCardBody>
                                         <InlineCitationCarousel>
                                           <InlineCitationCarouselHeader>
                                             <InlineCitationCarouselIndex />
                                           </InlineCitationCarouselHeader>
                                           <InlineCitationCarouselContent>
-                                            {lastSources.map((s:any, idx:number)=> (
+                                            {lastSources.map((s, idx:number)=> (
                                               <InlineCitationCarouselItem key={idx}>
                                                 <InlineCitationSource title={s.title} url={s.url} description={s.description} />
                                               </InlineCitationCarouselItem>
@@ -261,7 +280,7 @@ const ChatBotDemo = () => {
                               </div>
                             </MessageContent>
                           </Message>
-                          {message.role === 'assistant' && i === (message as any).parts.length - 1 && (
+                          {message.role === 'assistant' && i === (message.parts?.length ?? 0) - 1 && (
                             <Actions className="mt-1">
                               <Action
                                 onClick={() => regenerate()}
@@ -271,7 +290,7 @@ const ChatBotDemo = () => {
                               </Action>
                               <Action
                                 onClick={() =>
-                                  navigator.clipboard.writeText(part.text)
+                                  navigator.clipboard.writeText((part as Extract<ChatPart, { type: 'text' }>).text)
                                 }
                                 label="Copy"
                               >
@@ -286,10 +305,10 @@ const ChatBotDemo = () => {
                         <Reasoning
                           key={`${message.id}-${i}`}
                           className="w-full"
-                          isStreaming={status === 'streaming' && i === (message as any).parts.length - 1 && message.id === messages.at(-1)?.id}
+                          isStreaming={status === 'streaming' && i === (message.parts?.length ?? 0) - 1 && message.id === (messages as unknown as ChatMessage[]).at(-1)?.id}
                         >
                           <ReasoningTrigger />
-                          <ReasoningContent>{part.text}</ReasoningContent>
+                          <ReasoningContent>{(part as Extract<ChatPart, { type: 'reasoning' }>).text}</ReasoningContent>
                         </Reasoning>
                       );
                     default:
@@ -312,7 +331,7 @@ const ChatBotDemo = () => {
               <Message from="assistant">
                 <MessageContent>
                   <Response>
-                    {`Here is a demo response to your message: "${(lastMessage as any)?.content ?? ''}"`}
+                    {`Here is a demo response to your message: "${lastMessage?.content ?? ''}"`}
                   </Response>
                 </MessageContent>
               </Message>

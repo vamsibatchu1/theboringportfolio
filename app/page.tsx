@@ -1,6 +1,6 @@
 "use client"
-import ChatBotDemo from '@/components/chat/ChatBotDemo'
-import { Editor } from '@/components/blocks/editor-x/editor'
+import SidePanel from '@/app/side-panel/SidePanel'
+import { Editor } from '@/app/editor-panel/editor'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function Home() {
@@ -11,7 +11,7 @@ export default function Home() {
           <Editor />
         </div>
         <div className="md:col-span-3 h-full min-h-0"> 
-          <ChatBotDemo />
+          <SidePanel />
         </div>
       </div>
     </div>
