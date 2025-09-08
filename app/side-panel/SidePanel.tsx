@@ -218,7 +218,8 @@ const ChatBotDemo = () => {
       <Tabs className="px-2 pt-2 mb-2">
             <TabsList>
               <TabsTrigger value="chat">Ask me anything</TabsTrigger>
-              <TabsTrigger value="editor">Casestudy filters</TabsTrigger>
+              <TabsTrigger value="editor">Tab 2</TabsTrigger>
+              <TabsTrigger value="new">Tab 3</TabsTrigger>
             </TabsList>
       </Tabs>
         <Conversation className="flex-1 min-h-0">
