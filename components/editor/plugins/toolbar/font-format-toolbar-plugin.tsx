@@ -58,7 +58,7 @@ export function FontFormatToolbarPlugin({
       onPressedChange={setIsSelected}
       onClick={() => {
         // Select entire document before applying format so the preview text updates as a whole
-        activeEditor.dispatchCommand(SELECT_ALL_COMMAND, undefined)
+        activeEditor.dispatchCommand(SELECT_ALL_COMMAND, undefined as unknown as KeyboardEvent)
         activeEditor.dispatchCommand(
           FORMAT_TEXT_COMMAND,
           format as TextFormatType
