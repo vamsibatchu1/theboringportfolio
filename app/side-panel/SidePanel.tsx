@@ -1,56 +1,14 @@
 'use client';
 
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from '@/components/ai-elements/conversation';
-import { Message, MessageContent } from '@/components/ai-elements/message';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  PromptInput,
-  PromptInputButton,
-  PromptInputModelSelect,
-  PromptInputModelSelectContent,
-  PromptInputModelSelectItem,
-  PromptInputModelSelectTrigger,
-  PromptInputModelSelectValue,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputToolbar,
-  PromptInputTools,
-} from '@/components/ai-elements/prompt-input';
-import { Actions, Action } from '@/components/ai-elements/actions';
+// Conversation UI moved into TabOne view
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import TabOne from "@/app/side-panel/views/TabOne"
+import TabTwo from "@/app/side-panel/views/TabTwo"
+import TabThree from "@/app/side-panel/views/TabThree"
+// Prompt input moved into TabOne view
 import { useState, Fragment, useMemo, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { Response } from '@/components/ai-elements/response';
-import { Suggestions, Suggestion } from '@/components/ai-elements/suggestion';
-import { GlobeIcon, CopyIcon, RefreshCcwIcon } from 'lucide-react';
-import {
-  Source,
-  Sources,
-  SourcesContent,
-  SourcesTrigger,
-} from '@/components/ai-elements/sources';
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@/components/ai-elements/reasoning';
-// import { Loader } from '@/components/ai-elements/loader';
-import { Task, TaskContent, TaskItem, TaskTrigger } from '@/components/ai-elements/task';
-import {
-  InlineCitation,
-  InlineCitationCard,
-  InlineCitationCardBody,
-  InlineCitationCardTrigger,
-  InlineCitationCarousel,
-  InlineCitationCarouselContent,
-  InlineCitationCarouselHeader,
-  InlineCitationCarouselIndex,
-  InlineCitationCarouselItem,
-  InlineCitationSource,
-} from '@/components/ai-elements/inline-citation';
+// Auxiliary UI moved into TabOne view
 
 type ChatPart =
   | { type: 'text'; text: string }
@@ -215,183 +173,42 @@ const ChatBotDemo = () => {
   return (
     <div className="bg-background overflow-hidden rounded-lg border shadow h-full flex flex-col relative">
       <div className="flex flex-col h-full">
-      <Tabs className="px-2 pt-2 mb-2">
+      <Tabs defaultValue="chat" className="px-2 pt-2 mb-2 flex h-full flex-col">
             <TabsList>
               <TabsTrigger value="chat">Ask me anything</TabsTrigger>
               <TabsTrigger value="editor">Tab 2</TabsTrigger>
               <TabsTrigger value="new">Tab 3</TabsTrigger>
             </TabsList>
-      </Tabs>
-        <Conversation className="flex-1 min-h-0">
-          <ConversationContent>
-            {(messages as unknown as ChatMessage[]).map((message) => (
-              <div key={message.id}>
-                {message.role === 'assistant' && (message.parts?.filter((part) => part.type === 'source-url').length ?? 0) > 0 && (
-                  <Sources>
-                    <SourcesTrigger
-                      count={(message.parts ?? []).filter(
-                        (part) => part.type === 'source-url',
-                      ).length}
-                    />
-                    {(message.parts ?? [])
-                      .filter((part): part is Extract<ChatPart, { type: 'source-url' }> => part.type === 'source-url')
-                      .map((part, i: number) => (
-                      <SourcesContent key={`${message.id}-${i}`}>
-                        <Source
-                          key={`${message.id}-${i}`}
-                          href={part.url}
-                          title={part.url}
-                        />
-                      </SourcesContent>
-                    ))}
-                  </Sources>
-                )}
-                {(message.parts ?? []).map((part, i: number) => {
-                  switch (part.type) {
-                    case 'text':
-                      return (
-                        <Fragment key={`${message.id}-${i}`}>
-                          <Message from={message.role}>
-                            <MessageContent className={message.role === 'user' ? 'bg-black text-white rounded-[16px] px-3 py-2' : undefined}>
-                              <div className="flex flex-row flex-wrap items-baseline gap-2">
-                                <Response className="inline">
-                                  {(part as Extract<ChatPart, { type: 'text' }>).text}
-                                </Response>
-                                {message.role === 'assistant' && !!lastSources.length && (
-                                  <InlineCitation>
-                                    <InlineCitationCard>
-                                      <InlineCitationCardTrigger sources={lastSources.map((s)=>s.url)} />
-                                      <InlineCitationCardBody>
-                                        <InlineCitationCarousel>
-                                          <InlineCitationCarouselHeader>
-                                            <InlineCitationCarouselIndex />
-                                          </InlineCitationCarouselHeader>
-                                          <InlineCitationCarouselContent>
-                                            {lastSources.map((s, idx:number)=> (
-                                              <InlineCitationCarouselItem key={idx}>
-                                                <InlineCitationSource title={s.title} url={s.url} description={s.description} />
-                                              </InlineCitationCarouselItem>
-                                            ))}
-                                          </InlineCitationCarouselContent>
-                                        </InlineCitationCarousel>
-                                      </InlineCitationCardBody>
-                                    </InlineCitationCard>
-                                  </InlineCitation>
-                                )}
-                              </div>
-                            </MessageContent>
-                          </Message>
-                          {message.role === 'assistant' && i === (message.parts?.length ?? 0) - 1 && (
-                            <Actions className="mt-1">
-                              <Action
-                                onClick={() => regenerate()}
-                                label="Retry"
-                              >
-                                <RefreshCcwIcon className="size-3" />
-                              </Action>
-                              <Action
-                                onClick={() =>
-                                  navigator.clipboard.writeText((part as Extract<ChatPart, { type: 'text' }>).text)
-                                }
-                                label="Copy"
-                              >
-                                <CopyIcon className="size-3" />
-                              </Action>
-                            </Actions>
-                          )}
-                        </Fragment>
-                      );
-                    case 'reasoning':
-                      return (
-                        <Reasoning
-                          key={`${message.id}-${i}`}
-                          className="w-full"
-                          isStreaming={status === 'streaming' && i === (message.parts?.length ?? 0) - 1 && message.id === (messages as unknown as ChatMessage[]).at(-1)?.id}
-                        >
-                          <ReasoningTrigger />
-                          <ReasoningContent>{(part as Extract<ChatPart, { type: 'reasoning' }>).text}</ReasoningContent>
-                        </Reasoning>
-                      );
-                    default:
-                      return null;
-                  }
-                })}
-              </div>
-            ))}
-            {isThinking && (
-              <Task className="w-full">
-                <TaskTrigger title={thinkingText || 'Thinking…'} />
-                <TaskContent>
-                  {taskItems.map((t, idx) => (
-                    <TaskItem key={idx}>{t}</TaskItem>
-                  ))}
-                </TaskContent>
-              </Task>
-            )}
-            {shouldShowMockAssistant && (
-              <Message from="assistant">
-                <MessageContent>
-                  <Response>
-                    {`Here is a demo response to your message: "${lastMessage?.content ?? ''}"`}
-                  </Response>
-                </MessageContent>
-              </Message>
-            )}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-
-        <div className="mt-2 px-2">
-          <Suggestions>
-            {suggestions.map((s) => (
-              <Suggestion
-                key={s}
-                suggestion={s}
-                onClick={async (text) => {
-                  setSuggestions((prev) => prev.filter((x) => x !== text))
-                  await processUserText(text)
-                }}
-              />
-            ))}
-          </Suggestions>
-        </div>
-
-        <PromptInput onSubmit={handleSubmit} className="mt-2 flex-shrink-0 border-0 px-2 py-2 shadow-none">
-          <PromptInputTextarea
-            className="border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            onChange={(e) => setInput(e.target.value)}
-            value={input}
+        <TabsContent value="chat" className="m-0 p-0 border-0 flex-1 min-h-0">
+          <TabOne
+            messages={messages as unknown as ChatMessage[]}
+            lastSources={lastSources}
+            isThinking={isThinking}
+            thinkingText={thinkingText}
+            taskItems={taskItems}
+            regenerate={regenerate}
+            status={status}
+            suggestions={suggestions}
+            setSuggestions={(updater) => setSuggestions((prev) => updater(prev))}
+            processUserText={processUserText}
+            handleSubmit={handleSubmit}
+            input={input}
+            setInput={setInput}
+            webSearch={webSearch}
+            setWebSearch={setWebSearch}
+            model={model}
+            setModel={setModel}
+            models={models}
+            lastMessage={lastMessage}
           />
-          <PromptInputToolbar className="border-0 shadow-none">
-            <PromptInputTools>
-              <PromptInputButton
-                variant={webSearch ? 'default' : 'ghost'}
-                onClick={() => setWebSearch(!webSearch)}
-              >
-                <GlobeIcon size={16} />
-                <span>Search</span>
-              </PromptInputButton>
-              <PromptInputModelSelect
-                onValueChange={(value) => {
-                  setModel(value);
-                }}
-                value={model}
-              >
-                <PromptInputModelSelectTrigger>
-                  <PromptInputModelSelectValue />
-                </PromptInputModelSelectTrigger>
-                <PromptInputModelSelectContent>
-                  {models.map((model) => (
-                    <PromptInputModelSelectItem key={model.value} value={model.value}>
-                      {model.name}
-                    </PromptInputModelSelectItem>
-                  ))}
-                </PromptInputModelSelectContent>
-              </PromptInputModelSelect>
-            </PromptInputTools>
-            <PromptInputSubmit disabled={!input} status={status} />
-          </PromptInputToolbar>
-        </PromptInput>
+        </TabsContent>
+        <TabsContent value="editor" className="m-0 p-0 border-0 flex-1 min-h-0">
+          <TabTwo />
+        </TabsContent>
+        <TabsContent value="new" className="m-0 p-0 border-0 flex-1 min-h-0">
+          <TabThree />
+        </TabsContent>
+      </Tabs>
       </div>
     </div>
   );
